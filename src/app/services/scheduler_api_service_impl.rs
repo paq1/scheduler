@@ -12,9 +12,7 @@ pub struct SchedulerApiServiceImpl {
 #[async_trait]
 impl SchedulerApiService for SchedulerApiServiceImpl {
     async fn get_all_jobs(&self) -> Result<Vec<JobView>, CustomError> {
-        println!("call : ");
         let url = self.env_service.get_url_api()?;
-        println!("url : {}", url.clone());
         reqwest::get(format!("{}/tasks", url))
             .and_then(|response| {
                 response.json::<Vec<JobView>>()
