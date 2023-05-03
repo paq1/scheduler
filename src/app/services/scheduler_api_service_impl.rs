@@ -42,4 +42,16 @@ impl SchedulerApiService for SchedulerApiServiceImpl {
             .map(|_| ())
             .map_err(|_| CustomError::new("erreur lors du changement d'etat"))
     }
+
+    async fn running_jobs(&self, jobs: Vec<JobView>) -> Result<(), CustomError> {
+
+        for job in jobs.iter() {
+            self
+                .running_one_job(job.id.as_str())
+                .await
+                .expect("erreur lors de l'envoi");
+        };
+
+        Ok(())
+    }
 }
