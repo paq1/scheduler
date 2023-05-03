@@ -1,15 +1,15 @@
-#[macro_use]
-extern crate lazy_static;
-
-use std::future::Future;
+use std::sync::Arc;
 use std::thread;
-use std::sync::{Arc, Mutex};
-use std::sync::mpsc::channel;
-use tokio::time::Duration;
+use std::time::Duration;
 use clokwerk::{AsyncScheduler, TimeUnits};
+use tokio::sync::Mutex;
+use tokio::time::sleep;
 use crate::app::services::env_service_impl::EnvServiceImpl;
 use crate::app::services::scheduler_api_service_impl::SchedulerApiServiceImpl;
 use crate::core::services::scheduler_api_service::SchedulerApiService;
+
+#[macro_use]
+extern crate lazy_static;
 
 mod app;
 mod core;
@@ -21,26 +21,24 @@ lazy_static! {
 
 #[tokio::main]
 async fn main() {
-    println!("lancement du scheduler");
-    let (tx, rx) = channel();
-
-    let scheduler = Arc::new(
-        Mutex::new(AsyncScheduler::new())
-    );
-
+    let scheduler = Arc::new(Mutex::new(AsyncScheduler::new()));
     let running = Arc::new(
         Mutex::new(
             true
         )
     );
 
-    let thread_scheduler = tokio::spawn({
+    tokio::spawn({
         let scheduler_cloned = Arc::clone(&scheduler);
         let running_cloned = Arc::clone(&running);
 
-        async move {
 
-            while *running_cloned.lock().unwrap() {
+        async move {
+            scheduler_cloned.lock().await.every(1.seconds()).run(|| async {
+                println!("Hello, world!");
+            });
+
+            while *running_cloned.lock().await {
 
                 let pending_jobs = SCHEDULER_API_SERVICE
                     .get_pending_jobs()
@@ -58,7 +56,7 @@ async fn main() {
 
                     let mut scheduler_guard = scheduler_cloned
                         .lock()
-                        .unwrap();
+                        .await;
 
                     let job_id = job.id.to_string();
                     let route = job.url;
@@ -79,57 +77,40 @@ async fn main() {
                             let methode_cloned = methode.clone();
                             println!("setup scheduler");
                             println!("route a call : {}", route_cloned.clone());
-                            async {
+                            async move {
                                 println!("xxx");
-                                // println!("xxx {}", job_id_cloned);
-                                // if methode_cloned.to_uppercase().as_str() == "GET" {
-                                //     reqwest::get(route_cloned.clone())
-                                //         .await
-                                //         // .expect("erreur")
-                                //         .map(|response| {
-                                //             if response.status().as_u16() == 200u16 {
-                                //                 let now = chrono::offset::Utc::now();
-                                //                 println!("called : {} at {:?}", route_cloned, now);
-                                //             };
-                                //         })
-                                //         .expect(format!("erreur lors de l'execution de la requete du job {}", job_id_cloned).as_str());
-                                // } else {
-                                //     println!("bruh");
-                                // }
+                                println!("xxx {}", job_id_cloned);
+                                if methode_cloned.to_uppercase().as_str() == "GET" {
+                                    reqwest::get(route_cloned.clone())
+                                        .await
+                                        // .expect("erreur")
+                                        .map(|response| {
+                                            if response.status().as_u16() == 200u16 {
+                                                let now = chrono::offset::Utc::now();
+                                                println!("called : {} at {:?}", route_cloned, now);
+                                            };
+                                        })
+                                        .expect(format!("erreur lors de l'execution de la requete du job {}", job_id_cloned).as_str());
+                                } else {
+                                    println!("bruh");
+                                }
                             }
                         });
                 }
 
-                let mut scheduler_guard = scheduler_cloned
-                    .lock()
-                    .unwrap();
-
-                // scheduler_guard.run_pending().await;
-
-                thread::sleep(Duration::from_secs(2));
+                // thread::sleep(Duration::from_secs(2));
             }
         }
     });
 
-    let scheduler_action_thread = tokio::spawn({
-        let scheduler_cloned = Arc::clone(&scheduler);
+    tokio::spawn({
         async move {
-            loop {
-                let _ = scheduler_cloned.lock().unwrap().run_pending();
-                thread::sleep(Duration::from_secs(1));
-            }
+            println!("yo");
         }
     });
 
-    ctrlc::set_handler(move || {
-        tx.send(()).expect("couldn't send signals");
-    }).expect("Error setting ctrl-c handler");
-    rx.recv().expect("couldn't receive from channel.");
-    thread_scheduler.abort();
-    scheduler_action_thread.abort();
-
-    println!("ici");
-    let running_cloned = Arc::clone(&running);
-    let mut running_guard = running_cloned.lock().unwrap();
-    *running_guard = false;
+    loop {
+        scheduler.lock().await.run_pending().await;
+        sleep(Duration::from_millis(100)).await;
+    }
 }
