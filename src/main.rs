@@ -40,11 +40,6 @@ async fn main() {
                     .await
                     .unwrap_or(vec![]);
 
-                SCHEDULER_API_SERVICE
-                    .running_jobs(pending_jobs.clone())
-                    .await
-                    .expect("erreur lors du running des jobs");
-
                 if !pending_jobs.is_empty() {
                     println!("ajout d'un nouveau job {}", pending_jobs.len());
                 };
@@ -58,6 +53,11 @@ async fn main() {
                     let job_id = job.id.to_string();
                     let route = job.url;
                     let methode = job.http_method;
+
+                    SCHEDULER_API_SERVICE
+                        .running_one_job(job_id.as_str())
+                        .await
+                        .expect(format!("erreur lors du running du job {}", job_id).as_str());
 
 
                     scheduler_guard
