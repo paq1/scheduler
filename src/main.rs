@@ -1,14 +1,13 @@
 use std::sync::Arc;
 use std::sync::mpsc::channel;
 use std::time::Duration;
-use clokwerk::{AsyncScheduler, TimeUnits};
+use clokwerk::AsyncScheduler;
 use tokio::sync::Mutex;
 use tokio::time::sleep;
 use crate::app::services::env_service_impl::EnvServiceImpl;
 use crate::app::services::scheduler_api_service_impl::SchedulerApiServiceImpl;
 use crate::core::helpers::scheduler_helper::SchedulerHelper;
 use crate::core::services::scheduler_api_service::SchedulerApiService;
-use crate::models::views::job_view::JobView;
 
 #[macro_use]
 extern crate lazy_static;
