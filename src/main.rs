@@ -6,6 +6,7 @@ use tokio::sync::Mutex;
 use tokio::time::sleep;
 use crate::app::services::env_service_impl::EnvServiceImpl;
 use crate::app::services::scheduler_api_service_impl::SchedulerApiServiceImpl;
+use crate::core::helpers::scheduler_helper::SchedulerHelper;
 use crate::core::services::scheduler_api_service::SchedulerApiService;
 use crate::models::views::job_view::JobView;
 
@@ -50,15 +51,11 @@ async fn main() {
                 };
 
                 for job in pending_jobs.into_iter() {
-
-                    let mut scheduler_guard = scheduler_cloned
-                        .lock()
-                        .await;
-
-                    add_job(&mut scheduler_guard, job).await;
+                    scheduler_cloned
+                        .lock().await
+                        .add_job(job).await;
                 }
             }
-            println!("ending synchronisation scheduler");
         }
     });
 
@@ -72,7 +69,7 @@ async fn main() {
                     .run_pending().await;
                 sleep(Duration::from_millis(100)).await;
             }
-            println!("ending scheduler");
+            // println!("ending scheduler");
         }
     });
 
@@ -84,34 +81,4 @@ async fn main() {
     update_scheduler_thread.abort();
     *running.lock().await = false;
     println!("closed");
-}
-
-async fn add_job(scheduler: &mut AsyncScheduler, job: JobView) {
-    SCHEDULER_API_SERVICE
-        .running_one_job(job.id.as_str())
-        .await
-        .expect(format!("erreur lors du running du job {}", job.id).as_str());
-
-
-    scheduler
-        .every(job.repetition_seconds.unwrap_or(0).seconds())
-        .run(move || {
-            let job_id_cloned = job.id.clone();
-            let route_cloned = job.url.clone();
-            let methode_cloned = job.http_method.clone();
-            async move {
-                let now = chrono::offset::Utc::now();
-                println!("running : {} at {}", job_id_cloned, now.clone());
-                if methode_cloned.to_uppercase().as_str() == "GET" {
-                    reqwest::get(route_cloned.clone())
-                        .await
-                        .map(|response| {
-                            if response.status().as_u16() == 200u16 {
-                                println!("called : {} at {:?}", route_cloned, now);
-                            };
-                        })
-                        .expect(format!("erreur lors de l'execution de la requete du job {}", job_id_cloned).as_str());
-                };
-            }
-        });
 }
