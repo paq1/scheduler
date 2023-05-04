@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::sync::mpsc::channel;
 use std::time::Duration;
 use clokwerk::{AsyncScheduler, TimeUnits};
 use tokio::sync::Mutex;
@@ -20,6 +21,9 @@ lazy_static! {
 
 #[tokio::main]
 async fn main() {
+
+    let (tx, rx) = channel();
+
     let scheduler = Arc::new(Mutex::new(AsyncScheduler::new()));
     let running = Arc::new(
         Mutex::new(
@@ -27,7 +31,7 @@ async fn main() {
         )
     );
 
-    tokio::spawn({
+    let synchroniz_api_thread = tokio::spawn({
         let scheduler_cloned = Arc::clone(&scheduler);
         let running_cloned = Arc::clone(&running);
 
@@ -84,17 +88,30 @@ async fn main() {
                         });
                 }
             }
+            println!("ending synchronisation scheduler");
         }
     });
 
-    tokio::spawn({
+    let update_scheduler_thread = tokio::spawn({
+        let arc_scheduler = Arc::clone(&scheduler);
+        let arc_running = Arc::clone(&running);
         async move {
-            println!("yo");
+            while *arc_running.lock().await {
+                arc_scheduler
+                    .lock().await
+                    .run_pending().await;
+                sleep(Duration::from_millis(100)).await;
+            }
+            println!("ending scheduler");
         }
     });
 
-    loop {
-        scheduler.lock().await.run_pending().await;
-        sleep(Duration::from_millis(100)).await;
-    }
+    ctrlc::set_handler(move || {
+        tx.send(()).expect("couldn't send signals");
+    }).expect("Error setting ctrl-c handler");
+    rx.recv().expect("couldn't receive from channel.");
+    synchroniz_api_thread.abort();
+    update_scheduler_thread.abort();
+    *running.lock().await = false;
+    println!("closed");
 }
