@@ -1,5 +1,4 @@
 use std::sync::Arc;
-use std::thread;
 use std::time::Duration;
 use clokwerk::{AsyncScheduler, TimeUnits};
 use tokio::sync::Mutex;
@@ -34,10 +33,6 @@ async fn main() {
 
 
         async move {
-            scheduler_cloned.lock().await.every(1.seconds()).run(|| async {
-                println!("Hello, world!");
-            });
-
             while *running_cloned.lock().await {
 
                 let pending_jobs = SCHEDULER_API_SERVICE
@@ -50,8 +45,10 @@ async fn main() {
                     .await
                     .expect("erreur lors du running des jobs");
 
+                if !pending_jobs.is_empty() {
+                    println!("ajout d'un nouveau job {}", pending_jobs.len());
+                };
 
-                println!("nombre de jobs : {}", pending_jobs.len());
                 for job in pending_jobs.into_iter() {
 
                     let mut scheduler_guard = scheduler_cloned
@@ -62,12 +59,6 @@ async fn main() {
                     let route = job.url;
                     let methode = job.http_method;
 
-                    scheduler_guard
-                        .every(1.seconds())
-                        .run(|| async {
-                            println!("test -- running")
-                        });
-
 
                     scheduler_guard
                         .every(job.repetition_seconds.unwrap_or(0).seconds())
@@ -75,30 +66,23 @@ async fn main() {
                             let job_id_cloned = job_id.clone();
                             let route_cloned = route.clone();
                             let methode_cloned = methode.clone();
-                            println!("setup scheduler");
-                            println!("route a call : {}", route_cloned.clone());
                             async move {
-                                println!("xxx");
-                                println!("xxx {}", job_id_cloned);
+                                let now = chrono::offset::Utc::now();
+                                println!("running : {} at {}", job_id_cloned, now.clone());
                                 if methode_cloned.to_uppercase().as_str() == "GET" {
                                     reqwest::get(route_cloned.clone())
                                         .await
                                         // .expect("erreur")
                                         .map(|response| {
                                             if response.status().as_u16() == 200u16 {
-                                                let now = chrono::offset::Utc::now();
                                                 println!("called : {} at {:?}", route_cloned, now);
                                             };
                                         })
                                         .expect(format!("erreur lors de l'execution de la requete du job {}", job_id_cloned).as_str());
-                                } else {
-                                    println!("bruh");
-                                }
+                                };
                             }
                         });
                 }
-
-                // thread::sleep(Duration::from_secs(2));
             }
         }
     });
