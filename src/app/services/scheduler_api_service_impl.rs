@@ -54,4 +54,14 @@ impl SchedulerApiService for SchedulerApiServiceImpl {
 
         Ok(())
     }
+
+    async fn pending_all(&self) -> Result<(), CustomError> {
+        let url = self.env_service.get_url_api()?;
+        reqwest::Client::new()
+            .put(format!("{}/tasks/commands/pending_all", url))
+            .send()
+            .await
+            .map(|_| ())
+            .map_err(|_| CustomError::new("erreur lors du changement d'etat"))
+    }
 }

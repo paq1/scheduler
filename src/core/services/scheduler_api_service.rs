@@ -9,4 +9,5 @@ pub trait SchedulerApiService: 'static + Send + Sync {
     async fn get_pending_jobs(&self) -> Result<Vec<JobView>, CustomError>;
     async fn running_one_job(&self, id: &str) -> Result<(), CustomError>;
     async fn running_jobs(&self, jobs: Vec<JobView>) -> Result<(), CustomError>;
+    async fn pending_all(&self) -> Result<(), CustomError>;
 }

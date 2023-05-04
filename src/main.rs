@@ -79,5 +79,11 @@ async fn main() {
     synchroniz_api_thread.abort();
     update_scheduler_thread.abort();
     *running.lock().await = false;
+
+    SCHEDULER_API_SERVICE
+        .pending_all()
+        .await
+        .expect("erreur lors du pending des jobs");
+
     println!("closed");
 }
