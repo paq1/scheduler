@@ -2,6 +2,7 @@ use std::sync::Arc;
 use std::sync::mpsc::channel;
 use std::time::Duration;
 use clokwerk::AsyncScheduler;
+use once_cell::sync::Lazy;
 use tokio::sync::Mutex;
 use tokio::time::sleep;
 use crate::app::services::env_service_impl::EnvServiceImpl;
@@ -9,16 +10,13 @@ use crate::app::services::scheduler_api_service_impl::SchedulerApiServiceImpl;
 use crate::core::helpers::scheduler_helper::SchedulerHelper;
 use crate::core::services::scheduler_api_service::SchedulerApiService;
 
-#[macro_use]
-extern crate lazy_static;
-
 mod app;
 mod core;
 mod models;
 
-lazy_static! {
-    static ref SCHEDULER_API_SERVICE: SchedulerApiServiceImpl = SchedulerApiServiceImpl { env_service: Box::new(EnvServiceImpl::new()) };
-}
+static SCHEDULER_API_SERVICE: Lazy<SchedulerApiServiceImpl> = Lazy::new(|| {
+    SchedulerApiServiceImpl { env_service: Box::new(EnvServiceImpl::new()) }
+});
 
 #[tokio::main]
 async fn main() {

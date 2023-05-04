@@ -866,7 +866,7 @@ dependencies = [
  "ctrlc",
  "dotenv",
  "futures",
- "lazy_static",
+ "once_cell",
  "reqwest",
  "serde",
  "tokio",
